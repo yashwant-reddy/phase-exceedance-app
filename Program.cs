@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 using ClosedXML.Excel;
+using Microsoft.VisualBasic.FileIO;
 
 namespace ExceedanceFilterApp
 {
@@ -39,25 +40,29 @@ namespace ExceedanceFilterApp
         public static List<Dictionary<string, string>> LoadCsvToList(string csvPath)
         {
             var result = new List<Dictionary<string, string>>();
-            var lines = File.ReadAllLines(csvPath)
-                .Where(line => !string.IsNullOrWhiteSpace(line))
-                .ToList();
-            if (lines.Count < 2)
-                return result;
-
-            var headers = lines[0].Split(',').Select(h => h.Trim(' ', '\uFEFF', '"')).ToList();
-
-            for (int i = 1; i < lines.Count; i++)
+            using (TextFieldParser parser = new TextFieldParser(csvPath))
             {
-                var row = new Dictionary<string, string>();
-                var cols = lines[i].Split(',');
-                for (int j = 0; j < headers.Count && j < cols.Length; j++)
-                    row[headers[j]] = cols[j].Trim('"');
-                result.Add(row);
+                parser.TextFieldType = FieldType.Delimited;
+                parser.SetDelimiters(",");
+                parser.HasFieldsEnclosedInQuotes = true;
+
+                // Read header
+                if (parser.EndOfData) return result;
+                string[] headers = parser.ReadFields();
+                while (!parser.EndOfData)
+                {
+                    string[] fields = parser.ReadFields();
+                    if (fields == null || fields.Length == 0) continue;
+                    var row = new Dictionary<string, string>();
+                    for (int i = 0; i < headers.Length && i < fields.Length; i++)
+                    {
+                        row[headers[i].Trim(' ', '\uFEFF', '"')] = fields[i].Trim(' ', '"');
+                    }
+                    result.Add(row);
+                }
             }
             return result;
         }
-
         /// <summary>
         /// Determines the limit (High > Medium > Low > NA)
         /// </summary>
@@ -254,7 +259,13 @@ namespace ExceedanceFilterApp
 
                 // Condition pairs and string
                 var conditionPairs = GetConditionPairs(cfg);
+
+                // Debug print: See all parsed conditions for this config row
+                foreach (var pair in conditionPairs)
+                    Console.WriteLine($"  ConditionPair: {pair.Column} {pair.Condition}");
+
                 string condString = GetConditionString(conditionPairs);
+
 
                 // Filtering data rows: all conditions (possibly multiple for one column) must pass
                 List<Dictionary<string, string>> filtered = new List<Dictionary<string, string>>();

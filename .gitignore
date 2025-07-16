@@ -3,3 +3,4 @@ obj/
 *.csv
 *.xlsx
 *.xlsm
+.vs/

@@ -207,22 +207,22 @@ namespace ExceedanceFilterApp
             using var workbook = new XLWorkbook();
 
             // 1. Add RawData sheet for reference
-            var wsRaw = workbook.Worksheets.Add("RawData");
-            for (int c = 0; c < dataHeaders.Count; c++)
-            {
-                wsRaw.Cell(1, c + 1).Value = dataHeaders[c];
-                wsRaw.Cell(1, c + 1).Style.Font.Bold = true;
-                wsRaw.Cell(1, c + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            }
-            for (int r = 0; r < dataRows.Count; r++)
-            {
-                for (int c = 0; c < dataHeaders.Count; c++)
-                {
-                    wsRaw.Cell(r + 2, c + 1).Value = dataRows[r][dataHeaders[c]];
-                }
-            }
-            wsRaw.Columns().AdjustToContents();
-            Console.WriteLine("RawData sheet written (all flight data included for reference).");
+            //var wsRaw = workbook.Worksheets.Add("RawData");
+            //for (int c = 0; c < dataHeaders.Count; c++)
+            //{
+            //    wsRaw.Cell(1, c + 1).Value = dataHeaders[c];
+            //    wsRaw.Cell(1, c + 1).Style.Font.Bold = true;
+            //    wsRaw.Cell(1, c + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            //}
+            //for (int r = 0; r < dataRows.Count; r++)
+            //{
+            //    for (int c = 0; c < dataHeaders.Count; c++)
+            //    {
+            //        wsRaw.Cell(r + 2, c + 1).Value = dataRows[r][dataHeaders[c]];
+            //    }
+            //}
+            //wsRaw.Columns().AdjustToContents();
+            //Console.WriteLine("RawData sheet written (all flight data included for reference).");
 
             int configRowIndex = 0;
             foreach (var cfg in configRows)

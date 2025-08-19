@@ -1,4 +1,5 @@
 ﻿using ExceedanceFilterApp; // Use your backend class
+using PhaseFilterApp; // Use your backend class for phase filtering
 using Microsoft.Win32;
 using System;
 using System.Diagnostics;
@@ -179,10 +180,110 @@ namespace PhaseExceedanceFilterApp.Gui
         }
 
         // Placeholder for Phase button
-        private void Phase_Click(object sender, RoutedEventArgs e)
+        private async void Phase_Click(object sender, RoutedEventArgs e)
         {
-            LogBox.Text = "Phase button pressed (not implemented yet).\n";
+            // Disable UI and show loader
+            SetUiEnabled(false);
+            LoaderBar.Visibility = Visibility.Visible;
+            LogBox.Text = "Phase calculation in progress, please wait...\nTime elapsed: 0.0 s";
+
+            string configPath = ConfigPathBox.Text.Trim();
+            string dataPath = DataPathBox.Text.Trim();
+
+            // Validate input files
+            if (!File.Exists(configPath))
+            {
+                LogBox.Text = "Config file not found.\n";
+                LoaderBar.Visibility = Visibility.Collapsed;
+                SetUiEnabled(true);
+                return;
+            }
+            if (!File.Exists(dataPath))
+            {
+                LogBox.Text = "Data file not found.\n";
+                LoaderBar.Visibility = Visibility.Collapsed;
+                SetUiEnabled(true);
+                return;
+            }
+
+            // Set output file path
+            string outputFile = Path.Combine(
+                Path.GetDirectoryName(dataPath) ?? Environment.CurrentDirectory,
+                "PhaseFilteredOutput.xlsx"
+            );
+
+            stopwatch = Stopwatch.StartNew();
+            timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromMilliseconds(200);
+            timer.Tick += (s, args) =>
+            {
+                var logLines = LogBox.Text.Split('\n');
+                if (logLines.Length > 0)
+                    logLines[logLines.Length - 1] = $"Time elapsed: {stopwatch.Elapsed.TotalSeconds:F1} s";
+                LogBox.Text = string.Join("\n", logLines);
+                LogBox.CaretIndex = LogBox.Text.Length;
+                LogBox.ScrollToEnd();
+            };
+            timer.Start();
+
+            try
+            {
+                // Try to open file for writing or clear existing content
+                bool canWrite = true;
+                if (File.Exists(outputFile))
+                {
+                    try
+                    {
+                        using (var fs = new FileStream(outputFile, FileMode.Truncate, FileAccess.Write, FileShare.None)) { }
+                    }
+                    catch (IOException)
+                    {
+                        canWrite = false;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        canWrite = false;
+                    }
+                }
+
+                if (!canWrite)
+                {
+                    throw new IOException("The output Excel file is open in another application. Please close it and try again.");
+                }
+
+                // Run the phase filter in a background thread
+                await Task.Run(() =>
+                {
+                    PhaseFilterApp.Program.PhaseFilterToExcel(configPath, dataPath, outputFile);
+                });
+
+                stopwatch.Stop();
+                timer.Stop();
+
+                if (!File.Exists(outputFile))
+                {
+                    LogBox.Text += $"\n❌ Output file was not created. Something went wrong.";
+                }
+                else
+                {
+                    LogBox.Text += $"\n✅ Done! Excel file created: {outputFile}";
+                }
+                LogBox.Text += $"\nTotal time taken: {stopwatch.Elapsed.TotalSeconds:F1} s";
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                timer.Stop();
+                LogBox.Text += $"\n❌ Error: {ex.Message}";
+                LogBox.Text += $"\nTotal time taken: {stopwatch.Elapsed.TotalSeconds:F1} s";
+            }
+            finally
+            {
+                LoaderBar.Visibility = Visibility.Collapsed;
+                SetUiEnabled(true);
+            }
         }
+
 
         // Placeholder for Summary button
         private void Summary_Click(object sender, RoutedEventArgs e)

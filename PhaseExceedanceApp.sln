@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExceedanceFilterApp", "Exce
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhaseExceedanceFilterApp.Gui", "PhaseExceedanceFilterApp.Gui\PhaseExceedanceFilterApp.Gui.csproj", "{63D70693-8266-4D34-B7AC-CCBB1DCEB533}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhaseFilterApp", "PhaseFilterApp\PhaseFilterApp.csproj", "{540B1498-0670-44CC-9839-D87DA382843E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{63D70693-8266-4D34-B7AC-CCBB1DCEB533}.Release|x64.Build.0 = Release|Any CPU
 		{63D70693-8266-4D34-B7AC-CCBB1DCEB533}.Release|x86.ActiveCfg = Release|Any CPU
 		{63D70693-8266-4D34-B7AC-CCBB1DCEB533}.Release|x86.Build.0 = Release|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Debug|x64.Build.0 = Debug|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Debug|x86.Build.0 = Debug|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Release|x64.ActiveCfg = Release|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Release|x64.Build.0 = Release|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Release|x86.ActiveCfg = Release|Any CPU
+		{540B1498-0670-44CC-9839-D87DA382843E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

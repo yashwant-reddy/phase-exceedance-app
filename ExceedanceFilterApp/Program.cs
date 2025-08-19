@@ -4,6 +4,7 @@ using System.Linq;
 using System.Collections.Generic;
 using ClosedXML.Excel;
 using Microsoft.VisualBasic.FileIO;
+using System.Globalization;
 
 namespace ExceedanceFilterApp
 {
@@ -11,10 +12,12 @@ namespace ExceedanceFilterApp
     {
         public static void Main(string[] args)
         {
+            // --- Main entry: file paths are hardcoded for demonstration purposes.
             string configCsvPath = @"FilterConfig.csv";
             string dataCsvPath = @"VT-AQL.csv";
             string outputExcelPath = @"FilteredOutput.xlsx";
 
+            // --- Check for presence of required input files.
             if (!File.Exists(configCsvPath))
             {
                 Console.WriteLine("Missing required config CSV file.");
@@ -31,11 +34,12 @@ namespace ExceedanceFilterApp
                 Console.WriteLine("🗑️ Existing output file deleted.");
             }
 
+            // --- Run the exceedance filtering/export logic.
             ExceedanceFilterToExcel(configCsvPath, dataCsvPath, outputExcelPath);
         }
 
         /// <summary>
-        /// Load CSV into list of dictionaries
+        /// Loads a CSV into a list of dictionaries (header:value).
         /// </summary>
         public static List<Dictionary<string, string>> LoadCsvToList(string csvPath)
         {
@@ -63,24 +67,60 @@ namespace ExceedanceFilterApp
             }
             return result;
         }
+
         /// <summary>
-        /// Determines the limit (High > Medium > Low > NA)
+        /// Determines which limit is used (High > Medium > Low), 
+        /// returns limit value, sets out param limitType ("High Limit", etc.), and returns null if none found.
         /// </summary>
-        public static string DetermineLimit(Dictionary<string, string> cfg, out string note)
+        public static string DetermineLimit(Dictionary<string, string> cfg, out string limitType, out string note)
         {
             note = null;
+            limitType = null;
             if (!string.IsNullOrEmpty(cfg.GetValueOrDefault("High Limit")))
+            {
+                limitType = "High Limit";
                 return cfg["High Limit"];
+            }
             if (!string.IsNullOrEmpty(cfg.GetValueOrDefault("Medium Limit")))
+            {
+                limitType = "Medium Limit";
                 return cfg["Medium Limit"];
+            }
             if (!string.IsNullOrEmpty(cfg.GetValueOrDefault("Low Limit")))
+            {
+                limitType = "Low Limit";
                 return cfg["Low Limit"];
+            }
             note = "Note: No Limits Given";
-            return "NA";
+            return null;
         }
 
         /// <summary>
-        /// Expands (ColumnN, ConditionN) into a list. Supports comma-splitting conditions.
+        /// Returns filter time (in seconds) based on which limit is active.
+        /// If filter time is blank or missing for present limit, returns 1.
+        /// </summary>
+        public static int GetFilterTime(Dictionary<string, string> cfg, string limitType)
+        {
+            // Select filter time string based on limit type
+            string filterTimeStr = null;
+            if (limitType == "High Limit")
+                filterTimeStr = cfg.GetValueOrDefault("High Filter Time");
+            else if (limitType == "Medium Limit")
+                filterTimeStr = cfg.GetValueOrDefault("Medium Filter Time");
+            else if (limitType == "Low Limit")
+                filterTimeStr = cfg.GetValueOrDefault("Low Filter Time");
+
+            int filterTimeSeconds = 1; // Default value if missing or not valid
+            if (!string.IsNullOrWhiteSpace(filterTimeStr))
+            {
+                int.TryParse(filterTimeStr.Trim(), out filterTimeSeconds);
+                if (filterTimeSeconds < 1) filterTimeSeconds = 1;
+            }
+            return filterTimeSeconds;
+        }
+
+        /// <summary>
+        /// Expands (ColumnN, ConditionN) into a list of pairs. Supports comma-splitting for multiple conditions.
         /// </summary>
         public static List<(string Column, string Condition)> GetConditionPairs(Dictionary<string, string> cfg)
         {
@@ -108,7 +148,7 @@ namespace ExceedanceFilterApp
         }
 
         /// <summary>
-        /// Returns the full expanded AND-ed condition string (one per condition)
+        /// Returns a human-readable string summarizing all AND-ed conditions.
         /// </summary>
         public static string GetConditionString(List<(string Column, string Condition)> pairs)
         {
@@ -135,7 +175,7 @@ namespace ExceedanceFilterApp
         }
 
         /// <summary>
-        /// All conditions must pass (multiple per column is AND logic)
+        /// All conditions must pass for a row. Multiple per column is AND logic.
         /// </summary>
         public static bool AllConditionsPass(Dictionary<string, string> row, List<(string Column, string Condition)> condPairs)
         {
@@ -158,7 +198,7 @@ namespace ExceedanceFilterApp
         }
 
         /// <summary>
-        /// Compares a single value with a condition string (>, <, >=, <=, =)
+        /// Compares a single value with a condition string (>, <, >=, <=, =), numeric or string.
         /// </summary>
         public static bool ConditionMatch(string cellVal, string cond)
         {
@@ -189,7 +229,73 @@ namespace ExceedanceFilterApp
         }
 
         /// <summary>
-        /// Main logic: applies all filter config, writes reference sheet, and logs to Excel and console
+        /// Parses "HH:MM:SS" string to TimeSpan, returns null if invalid.
+        /// </summary>
+        public static TimeSpan? ParseTime(string timeStr)
+        {
+            if (TimeSpan.TryParseExact(timeStr, "c", CultureInfo.InvariantCulture, out var t)) return t;
+            if (TimeSpan.TryParseExact(timeStr, @"hh\:mm\:ss", CultureInfo.InvariantCulture, out t)) return t;
+            if (TimeSpan.TryParse(timeStr, out t)) return t;
+            return null;
+        }
+
+        /// <summary>
+        /// Applies filter time grouping logic: returns only groups where the
+        /// threshold is exceeded for >= minFilterTime seconds (consecutive).
+        /// </summary>
+        /// <summary>
+        /// Filters using a sliding window of N seconds over the time column.
+        /// Only includes rows that are part of a window where all times are present and all rows meet the condition.
+        /// </summary>
+        public static List<Dictionary<string, string>> ApplyFilterTimeGrouping(
+            List<Dictionary<string, string>> filteredRows, // Already condition-checked
+            string timeColumn,
+            int windowSeconds)
+        {
+            if (filteredRows.Count == 0 || windowSeconds <= 1)
+                return filteredRows;
+
+            // Sort by time ascending
+            var rowsSorted = filteredRows
+                .Where(r => ParseTime(r[timeColumn]).HasValue)
+                .OrderBy(r => ParseTime(r[timeColumn]).Value)
+                .ToList();
+
+            var timeToRow = rowsSorted
+                .ToDictionary(r => ParseTime(r[timeColumn]).Value, r => r);
+
+            var outputRows = new HashSet<Dictionary<string, string>>();
+
+            for (int i = 0; i < rowsSorted.Count; i++)
+            {
+                var tStart = ParseTime(rowsSorted[i][timeColumn]).Value;
+                bool windowOk = true;
+                // Check for consecutive N-1 seconds present and valid
+                for (int j = 0; j < windowSeconds; j++)
+                {
+                    var tNext = tStart.Add(TimeSpan.FromSeconds(j));
+                    if (!timeToRow.ContainsKey(tNext))
+                    {
+                        windowOk = false;
+                        break;
+                    }
+                }
+                if (windowOk)
+                {
+                    // All rows in the window are valid, add all of them
+                    for (int j = 0; j < windowSeconds; j++)
+                    {
+                        var tNext = tStart.Add(TimeSpan.FromSeconds(j));
+                        outputRows.Add(timeToRow[tNext]);
+                    }
+                }
+            }
+            // Return rows in file order
+            return filteredRows.Where(r => outputRows.Contains(r)).ToList();
+        }
+
+        /// <summary>
+        /// Main logic: applies all filter config, writes output Excel, logs to console and sheet.
         /// </summary>
         public static void ExceedanceFilterToExcel(string configCsvPath, string dataCsvPath, string outputExcelPath)
         {
@@ -206,30 +312,12 @@ namespace ExceedanceFilterApp
             var sheetNameCounts = new Dictionary<string, int>();
             using var workbook = new XLWorkbook();
 
-            // 1. Add RawData sheet for reference
-            //var wsRaw = workbook.Worksheets.Add("RawData");
-            //for (int c = 0; c < dataHeaders.Count; c++)
-            //{
-            //    wsRaw.Cell(1, c + 1).Value = dataHeaders[c];
-            //    wsRaw.Cell(1, c + 1).Style.Font.Bold = true;
-            //    wsRaw.Cell(1, c + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            //}
-            //for (int r = 0; r < dataRows.Count; r++)
-            //{
-            //    for (int c = 0; c < dataHeaders.Count; c++)
-            //    {
-            //        wsRaw.Cell(r + 2, c + 1).Value = dataRows[r][dataHeaders[c]];
-            //    }
-            //}
-            //wsRaw.Columns().AdjustToContents();
-            //Console.WriteLine("RawData sheet written (all flight data included for reference).");
-
             int configRowIndex = 0;
             foreach (var cfg in configRows)
             {
                 configRowIndex++;
 
-                // SHEET NAME LOGIC (sanitize, deduplicate, truncate)
+                // --- Sanitize and deduplicate sheet name (Excel rules)
                 string baseSheetNameRaw = cfg.GetValueOrDefault("SheetName") ?? "Sheet";
                 char[] invalidChars = new char[] { '/', '\\', '?', '*', '[', ']', ':' };
                 string baseSheetName = baseSheetNameRaw;
@@ -251,50 +339,59 @@ namespace ExceedanceFilterApp
 
                 Console.WriteLine($"[Row {configRowIndex}] Config SheetName: \"{baseSheetNameRaw}\" → Excel SheetName: \"{validSheetName}\"");
 
-                // Limit logic
-                string noteLimit;
-                string limit = DetermineLimit(cfg, out noteLimit);
-                if (!string.IsNullOrEmpty(noteLimit))
+                // --- Determine which limit is being used (and its label, and note if missing)
+                string noteLimit, usedLimitType;
+                string usedLimit = DetermineLimit(cfg, out usedLimitType, out noteLimit);
+
+                // --- If no limits at all, skip this config row
+                if (usedLimit == null)
+                {
                     Console.WriteLine($"[Row {configRowIndex}] {noteLimit}");
+                    continue;
+                }
 
-                // Condition pairs and string
+                // --- Get filter time for the chosen limit, modular and reusable
+                int filterTimeSeconds = GetFilterTime(cfg, usedLimitType);
+
+                // --- Prepare condition pairs and string
                 var conditionPairs = GetConditionPairs(cfg);
-
-                // Debug print: See all parsed conditions for this config row
-                foreach (var pair in conditionPairs)
-                    Console.WriteLine($"  ConditionPair: {pair.Column} {pair.Condition}");
-
                 string condString = GetConditionString(conditionPairs);
 
-
-                // Filtering data rows: all conditions (possibly multiple for one column) must pass
-                List<Dictionary<string, string>> filtered = new List<Dictionary<string, string>>();
+                // --- Filtering rows: all conditions must pass
+                List<Dictionary<string, string>> filteredRows = new List<Dictionary<string, string>>();
                 string noteCondition = null;
                 if (conditionPairs.Count > 0)
                 {
                     Console.WriteLine($"[Row {configRowIndex}] Filter condition: {condString}");
-                    filtered = dataRows.Where(row => AllConditionsPass(row, conditionPairs)).ToList();
+                    filteredRows = dataRows.Where(row => AllConditionsPass(row, conditionPairs)).ToList();
                 }
                 else
                 {
                     noteCondition = "Note: No Condition Given";
                     Console.WriteLine($"[Row {configRowIndex}] {noteCondition}");
                 }
-                if (filtered.Count == 0)
+
+                // --- Apply filter time logic ONLY if time column exists and limit is present
+                string timeColumn = "HH:MM:SS";
+                if (!string.IsNullOrWhiteSpace(usedLimit) && filterTimeSeconds > 1 && filteredRows.Count > 0 && dataHeaders.Contains(timeColumn))
+                {
+                    filteredRows = ApplyFilterTimeGrouping(filteredRows, timeColumn, filterTimeSeconds);
+                }
+
+                if (filteredRows.Count == 0)
                     Console.WriteLine($"[Row {configRowIndex}] Note: No Exceedance Detected");
 
                 // --- Write to worksheet ---
                 var ws = workbook.Worksheets.Add(validSheetName);
-
                 int rowPtr = 1;
 
-                // Title (left-aligned, as requested)
-                ws.Cell(rowPtr, 1).Value = $"{baseSheetNameRaw} > {limit}";
+                // --- Title: include limit name, value (no parenthesis), and filter time in required format
+                ws.Cell(rowPtr, 1).Value = $"{baseSheetNameRaw} > {usedLimitType} {usedLimit} (Filter Time: {filterTimeSeconds} sec)";
                 ws.Row(rowPtr).Style.Font.Bold = true;
                 ws.Row(rowPtr).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
                 rowPtr++;
 
-                // Note: Limits
+                // --- Note: Limits
                 if (!string.IsNullOrEmpty(noteLimit))
                 {
                     ws.Cell(rowPtr, 1).Value = noteLimit;
@@ -302,7 +399,7 @@ namespace ExceedanceFilterApp
                     rowPtr++;
                 }
 
-                // Note: Conditions
+                // --- Note: Conditions
                 if (!string.IsNullOrEmpty(noteCondition))
                 {
                     ws.Cell(rowPtr, 1).Value = noteCondition;
@@ -316,7 +413,7 @@ namespace ExceedanceFilterApp
                     rowPtr++;
                 }
 
-                // Header row (always output header)
+                // --- Header row (always output header)
                 for (int c = 0; c < dataHeaders.Count; c++)
                 {
                     ws.Cell(rowPtr, c + 1).Value = dataHeaders[c];
@@ -325,16 +422,20 @@ namespace ExceedanceFilterApp
                 }
                 rowPtr++;
 
-                // Write filtered data, or note if empty
-                if (filtered.Count > 0)
+                // --- Write filtered data, or note if empty
+                if (filteredRows.Count > 0)
                 {
-                    for (int r = 0; r < filtered.Count; r++)
+                    for (int r = 0; r < filteredRows.Count; r++)
                     {
                         for (int c = 0; c < dataHeaders.Count; c++)
                         {
-                            ws.Cell(rowPtr + r, c + 1).Value = filtered[r][dataHeaders[c]];
+                            ws.Cell(rowPtr + r, c + 1).Value = filteredRows[r][dataHeaders[c]];
                         }
                     }
+                    // Add Row Count in the first empty row after data
+                    int rowCountCellRow = rowPtr + filteredRows.Count + 1;
+                    ws.Cell(rowCountCellRow, dataHeaders.Count + 1).Value = $"Row Count: {filteredRows.Count}";
+                    ws.Cell(rowCountCellRow, dataHeaders.Count + 1).Style.Font.Bold = true;
                 }
                 else
                 {

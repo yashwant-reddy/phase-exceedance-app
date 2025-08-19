@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ExceedanceFilterApp\ExceedanceFilterApp.csproj" />
+	<ProjectReference Include="..\PhaseFilterApp\PhaseFilterApp.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -39,117 +39,6 @@ namespace PhaseFilterApp
                 Console.WriteLine("❌ Error: " + ex.Message);
             }
         }
-        /// <summary>
-        /// Advanced: Checks if the cell value matches *all* comma-separated conditions.
-        /// Handles numeric and string (case-insensitive, trimmed) comparisons, and all operators.
-        /// </summary>
-        public static bool ConditionMatchAdvanced(string cellVal, string cond)
-        {
-            if (cond == null) return true;
-            if (cellVal == null) cellVal = "";
-
-            foreach (var c in cond.Split(','))
-            {
-                var condPart = c.Trim();
-                if (string.IsNullOrEmpty(condPart)) continue;
-
-                // Try numeric comparisons
-                if (double.TryParse(cellVal.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double cellNum))
-                {
-                    if (condPart.StartsWith(">="))
-                    {
-                        if (!(cellNum >= double.Parse(condPart.Substring(2), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else if (condPart.StartsWith("<="))
-                    {
-                        if (!(cellNum <= double.Parse(condPart.Substring(2), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else if (condPart.StartsWith(">"))
-                    {
-                        if (!(cellNum > double.Parse(condPart.Substring(1), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else if (condPart.StartsWith("<"))
-                    {
-                        if (!(cellNum < double.Parse(condPart.Substring(1), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else if (condPart.StartsWith("="))
-                    {
-                        if (!(cellNum == double.Parse(condPart.Substring(1), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else
-                    {
-                        continue; // skip unsupported
-                    }
-                }
-                else // String comparison
-                {
-                    string val = cellVal.Trim().Trim('"');
-                    string expected = condPart.Replace("==", "").Trim().Trim('"');
-
-                    if (condPart.StartsWith("=="))
-                    {
-                        if (!val.Equals(expected, StringComparison.OrdinalIgnoreCase)) return false;
-                    }
-                    else if (condPart.StartsWith("!="))
-                    {
-                        if (val.Equals(expected, StringComparison.OrdinalIgnoreCase)) return false;
-                    }
-                    else
-                    {
-                        if (!val.Equals(expected, StringComparison.OrdinalIgnoreCase)) return false;
-                    }
-                }
-            }
-            return true;
-        }
-
-        public static bool AllConditionsPassStrict(Dictionary<string, string> row, List<(string Column, string Condition)> condPairs)
-        {
-            foreach (var pair in condPairs)
-            {
-                if (!row.ContainsKey(pair.Column))
-                    return false;
-                string cellVal = row[pair.Column]?.Trim();
-                string[] condParts = pair.Condition.Split(',');
-
-                foreach (var cond in condParts)
-                {
-                    string part = cond.Trim();
-                    // Numeric
-                    if (part.StartsWith(">="))
-                    {
-                        if (!double.TryParse(cellVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double val) ||
-                            !(val >= double.Parse(part.Substring(2), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else if (part.StartsWith("<="))
-                    {
-                        if (!double.TryParse(cellVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double val) ||
-                            !(val <= double.Parse(part.Substring(2), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else if (part.StartsWith(">"))
-                    {
-                        if (!double.TryParse(cellVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double val) ||
-                            !(val > double.Parse(part.Substring(1), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else if (part.StartsWith("<"))
-                    {
-                        if (!double.TryParse(cellVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double val) ||
-                            !(val < double.Parse(part.Substring(1), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else if (part.StartsWith("="))
-                    {
-                        if (!double.TryParse(cellVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double val) ||
-                            !(val == double.Parse(part.Substring(1), CultureInfo.InvariantCulture))) return false;
-                    }
-                    else // String
-                    {
-                        if (!cellVal.Equals(part.Trim('"'), StringComparison.OrdinalIgnoreCase))
-                            return false;
-                    }
-                }
-            }
-            return true;
-        }
 
         /// <summary>
         /// Parses the config row to triplets: (Column, Condition, Logic) for AND/OR logic.
@@ -232,6 +121,7 @@ namespace PhaseFilterApp
         /// <summary>
         /// Evaluates a single condition (numeric or string match).
         /// Handles numeric ops (>, <, >=, <=, =) and string equality ("WOW").
+        /// Also handles single quote prefix removal (e.g., '==10 becomes ==10).
         /// </summary>
         public static bool EvaluateCondition(Dictionary<string, string> row, string column, string condition)
         {
@@ -243,6 +133,12 @@ namespace PhaseFilterApp
             {
                 var cond = part.Trim();
                 if (string.IsNullOrEmpty(cond)) continue;
+
+                // Remove single quote prefix if present
+                if (cond.StartsWith("'"))
+                {
+                    cond = cond.Substring(1);
+                }
 
                 // Numeric operators with trim
                 if (cond.StartsWith(">="))
@@ -258,6 +154,21 @@ namespace PhaseFilterApp
                     string compareVal = cond.Substring(2).Trim();
                     if (!double.TryParse(testVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double val) ||
                         !(val <= double.Parse(compareVal, CultureInfo.InvariantCulture))) return false;
+                }
+                else if (cond.StartsWith("=="))
+                {
+                    string compareVal = cond.Substring(2).Trim();
+                    // Try numeric comparison first
+                    if (double.TryParse(cellVal.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double cellNum) &&
+                        double.TryParse(compareVal, NumberStyles.Any, CultureInfo.InvariantCulture, out double condNum))
+                    {
+                        if (!(cellNum == condNum)) return false;
+                    }
+                    else // String comparison
+                    {
+                        if (!cellVal.Equals(compareVal.Trim('"'), StringComparison.OrdinalIgnoreCase))
+                            return false;
+                    }
                 }
                 else if (cond.StartsWith(">"))
                 {
@@ -288,7 +199,6 @@ namespace PhaseFilterApp
             }
             return true;
         }
-
 
         /// <summary>
         /// Builds a readable AND/OR logic condition string from phase config row for the Condition worksheet.
@@ -446,18 +356,21 @@ namespace PhaseFilterApp
         public static void PhaseFilterToExcel(string configCsvPath, string dataCsvPath, string outputExcelPath)
         {
             // --- Load all data rows (dictionary per row)
+            //     Keep existing block comment; we load the CSV into a list of row-dictionaries.
             var dataRows = ExceedanceFilterApp.Program.LoadCsvToList(dataCsvPath);
 
             // --- Always ensure output columns present and clean (remove others)
+            //     Initialize or reset computed/derived columns for every row.
             foreach (var row in dataRows)
             {
                 row["Altitude Rate"] = "";
                 row["Pitch Rate"] = "";
-                row["Sector"] = "";
+                row["Sector"] = "";    // Correct casing: Sector
                 row["Phase"] = "";
             }
 
             // --- STEP 1: Calculate Altitude Rate and Pitch Rate
+            //     Compute per-row differences vs previous row for altitude and pitch.
             for (int i = 1; i < dataRows.Count; i++)
             {
                 double altCurr = 0, altPrev = 0, pitchCurr = 0, pitchPrev = 0;
@@ -469,20 +382,61 @@ namespace PhaseFilterApp
                 dataRows[i]["Altitude Rate"] = (hasAltCurr && hasAltPrev) ? (altCurr - altPrev).ToString("F2", CultureInfo.InvariantCulture) : "";
                 dataRows[i]["Pitch Rate"] = (hasPitchCurr && hasPitchPrev) ? (pitchCurr - pitchPrev).ToString("F2", CultureInfo.InvariantCulture) : "";
             }
+
+            //     Explicitly set row 0 rates to 0.00 as there is no previous row for differences.
             if (dataRows.Count > 0)
             {
                 dataRows[0]["Altitude Rate"] = "0.00";
                 dataRows[0]["Pitch Rate"] = "0.00";
             }
 
+            // --- STEP 1A: **Single-row retention** for Altitude and Pitch Rates (requested rule)
+            //     Applies **equally** to both computed columns: `Altitude Rate` **and** `Pitch Rate`.
+            //     If a row's computed value is exactly zero, and the *next* row's value is non-zero,
+            //     copy the next value into the current row. This handles only a single-row gap.
+            //     Examples implemented (same rule for Altitude and Pitch):
+            //       0, 32, 0, 5  =>  32, 32, 5, 5
+            //       0, 0, 0, 5   =>  0, 0, 5, 5   (only the last zero before a non-zero is filled)
+            //     If the previous value is also zero (i.e., we're in a run of zeros), we keep zero
+            //     for those earlier rows because only the single row immediately before a non-zero
+            //     should be retained/fixed.
+            const double ZeroEpsilon = 1e-9; // tolerance for treating values as zero
+
+            //     Local helper to parse a double with invariant culture and default to 0 when blank.
+            double ParseOrZero(string s)
+                => double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var v) ? v : 0d;
+
+            //     Sweep forward and apply the "single-row retention" rule independently to each metric.
+            for (int i = 0; i < dataRows.Count - 1; i++)
+            {
+                // --- Altitude Rate retention (single-row lookahead)
+                double currAltRate = ParseOrZero(dataRows[i].GetValueOrDefault("Altitude Rate", ""));
+                double nextAltRate = ParseOrZero(dataRows[i + 1].GetValueOrDefault("Altitude Rate", ""));
+                if (Math.Abs(currAltRate) < ZeroEpsilon && Math.Abs(nextAltRate) > ZeroEpsilon)
+                {
+                    dataRows[i]["Altitude Rate"] = nextAltRate.ToString("F2", CultureInfo.InvariantCulture);
+                }
+
+                // --- Pitch Rate retention (single-row lookahead)
+                double currPitchRate = ParseOrZero(dataRows[i].GetValueOrDefault("Pitch Rate", ""));
+                double nextPitchRate = ParseOrZero(dataRows[i + 1].GetValueOrDefault("Pitch Rate", ""));
+                if (Math.Abs(currPitchRate) < ZeroEpsilon && Math.Abs(nextPitchRate) > ZeroEpsilon)
+                {
+                    dataRows[i]["Pitch Rate"] = nextPitchRate.ToString("F2", CultureInfo.InvariantCulture);
+                }
+            }
+
             // --- STEP 2: Fill sector column based on WOW transitions
+            //     Keep existing behavior for sector tagging.
             FillSectorByWOWTransitions(dataRows);
 
             // --- STEP 3: Assign phases and build Condition worksheet info in a single pass
+            //     Use configuration rows to assign phases and also compute the summary for the Condition sheet.
             var configLines = ExceedanceFilterApp.Program.LoadCsvToList(configCsvPath);
             var conditionRows = AssignPhasesAndBuildConditionRows(configLines, dataRows);
 
             // --- Build final header list: all input columns in original order, then the new columns (if not present already)
+            //     Preserve original column order; append derived columns if missing.
             var extraCols = new[] { "Altitude Rate", "Pitch Rate", "Sector", "Phase" };
             var allHeaders = dataRows.Count > 0
                 ? dataRows[0].Keys.ToList()
@@ -491,6 +445,7 @@ namespace PhaseFilterApp
                 if (!allHeaders.Contains(col)) allHeaders.Add(col);
 
             // --- Write to Excel: each value as number or string as per content
+            //     Use ClosedXML to write headers and data. Numbers are written as numbers; text as text.
             using var workbook = new ClosedXML.Excel.XLWorkbook();
             var ws = workbook.Worksheets.Add("FlightData");
 
@@ -506,20 +461,20 @@ namespace PhaseFilterApp
             {
                 for (int c = 0; c < allHeaders.Count; c++)
                 {
-                    string value = dataRows[r].GetValueOrDefault(allHeaders[c], "");
-                    // Try to parse as number using InvariantCulture
-                    if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out double numVal))
+                    string cellText = dataRows[r].GetValueOrDefault(allHeaders[c], "");
+                    if (double.TryParse(cellText, NumberStyles.Any, CultureInfo.InvariantCulture, out double numVal))
                     {
-                        ws.Cell(r + 2, c + 1).Value = numVal;
+                        ws.Cell(r + 2, c + 1).Value = numVal;  // numeric
                     }
                     else
                     {
-                        ws.Cell(r + 2, c + 1).Value = value;
+                        ws.Cell(r + 2, c + 1).Value = cellText; // text
                     }
                 }
             }
 
             // --- Create Condition worksheet: one row per config entry (Start and End), always present
+            //     Summarize configuration and how many times each block condition matched (optional QA count).
             var wsCond = workbook.Worksheets.Add("Condition");
             wsCond.Cell(1, 1).Value = "FlightPhase";
             wsCond.Cell(1, 2).Value = "Duration";
@@ -542,6 +497,7 @@ namespace PhaseFilterApp
                 int filterTime = 1;
                 int.TryParse(filterTimeStr, out filterTime);
                 if (filterTime < 1) filterTime = 1;
+
                 for (int i = 0; i <= dataRows.Count - filterTime;)
                 {
                     bool allMatch = true;
@@ -572,62 +528,10 @@ namespace PhaseFilterApp
                 condRow++;
             }
 
-
+            // --- Save workbook to the desired output path
             workbook.SaveAs(outputExcelPath);
         }
-
-        /// <summary>
-        /// Build robust condition rows for Condition worksheet, including block match count.
-        /// </summary>
-        public static List<(string Phase, string Duration, string FilterTime, string ConditionString, int MatchCount)>
-            BuildConditionRows(List<Dictionary<string, string>> configLines, List<Dictionary<string, string>> dataRows)
-        {
-            var conditionRows = new List<(string Phase, string Duration, string FilterTime, string ConditionString, int MatchCount)>();
-
-            foreach (var cfg in configLines)
-            {
-                string phase = cfg.GetValueOrDefault("FlightPhase") ?? "";
-                string duration = cfg.GetValueOrDefault("Duration") ?? "";
-                string filterTimeStr = cfg.GetValueOrDefault("FilterTime") ?? "1";
-                int filterTime = 1;
-                int.TryParse(filterTimeStr, out filterTime);
-                if (filterTime < 1) filterTime = 1;
-
-                // --- Use new GetConditionPairsSimple for AllConditionsPass
-                var condPairs = GetConditionTriplets(cfg);
-                string condStr = BuildHumanReadableConditionString(cfg);
-
-                // --- Count block matches in data (non-overlapping)
-                int matchCount = 0;
-                if (condPairs.Count > 0)
-                {
-                    for (int i = 0; i <= dataRows.Count - filterTime;)
-                    {
-                        bool allMatch = true;
-                        for (int k = 0; k < filterTime; k++)
-                        {
-                            if (!RowMatchesWithLogic(dataRows[i + k], condPairs))
-                            {
-                                allMatch = false;
-                                break;
-                            }
-                        }
-                        if (allMatch)
-                        {
-                            matchCount++;
-                            i += filterTime;
-                        }
-                        else
-                        {
-                            i++;
-                        }
-                    }
-                }
-                conditionRows.Add((phase, duration, filterTimeStr, condStr, matchCount));
-            }
-            return conditionRows;
-        }
-
+        
         /// <summary>
         /// Assigns sector labels ("NPS"/"NFS") only if a No WOW segment contains at least 60 rows of actual "No WOW".
         /// Blanks in the WOW column are ignored for threshold (do NOT count toward the 60).
@@ -843,15 +747,6 @@ namespace PhaseFilterApp
             }
         }
 
-        /// <summary>
-        /// Helper to safely parse doubles from string dictionary (handles missing/blank).
-        /// </summary>
-        private static double TryParseDouble(string value)
-        {
-            if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double d))
-                return d;
-            return double.NaN;
-        }
 
     }
 }

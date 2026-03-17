@@ -15,7 +15,7 @@ namespace ExceedanceFilterApp
             // --- Main entry: file paths are hardcoded for demonstration purposes.
             string configCsvPath = @"FilterConfig.csv";
             string dataCsvPath = @"VT-AQL.csv";
-            string outputExcelPath = @"FilteredOutput.xlsx";
+            string outputExcelPath = @"ExceedanceOutput.xlsx";
 
             // --- Check for presence of required input files.
             if (!File.Exists(configCsvPath))
@@ -41,32 +41,96 @@ namespace ExceedanceFilterApp
         /// <summary>
         /// Loads a CSV into a list of dictionaries (header:value).
         /// </summary>
+        //public static List<Dictionary<string, string>> LoadCsvToList(string csvPath)
+        //{
+        //    var result = new List<Dictionary<string, string>>();
+        //    using (TextFieldParser parser = new TextFieldParser(csvPath))
+        //    {
+        //        parser.TextFieldType = FieldType.Delimited;
+        //        parser.SetDelimiters(",");
+        //        parser.HasFieldsEnclosedInQuotes = true;
+
+        //        // Read header
+        //        if (parser.EndOfData) return result;
+        //        string[] headers = parser.ReadFields();
+        //        while (!parser.EndOfData)
+        //        {
+        //            string[] fields = parser.ReadFields();
+        //            if (fields == null || fields.Length == 0) continue;
+        //            var row = new Dictionary<string, string>();
+        //            for (int i = 0; i < headers.Length && i < fields.Length; i++)
+        //            {
+        //                row[headers[i].Trim(' ', '\uFEFF', '"')] = fields[i].Trim(' ', '"');
+        //            }
+        //            result.Add(row);
+        //        }
+        //    }
+        //    return result;
+        //}
+
+        //wip
         public static List<Dictionary<string, string>> LoadCsvToList(string csvPath)
         {
+            // Holds final CSV rows
             var result = new List<Dictionary<string, string>>();
+
             using (TextFieldParser parser = new TextFieldParser(csvPath))
             {
+                // Configure parser for comma-delimited CSV
                 parser.TextFieldType = FieldType.Delimited;
                 parser.SetDelimiters(",");
                 parser.HasFieldsEnclosedInQuotes = true;
 
-                // Read header
+                // If file is empty, return empty list
                 if (parser.EndOfData) return result;
+
+                // Read header row
                 string[] headers = parser.ReadFields();
+
+                // Clean header values (handle BOM, spaces, quotes)
+                for (int i = 0; i < headers.Length; i++)
+                {
+                    headers[i] = headers[i].Trim(' ', '\uFEFF', '"');
+                }
+
+                // Read data rows
                 while (!parser.EndOfData)
                 {
-                    string[] fields = parser.ReadFields();
-                    if (fields == null || fields.Length == 0) continue;
-                    var row = new Dictionary<string, string>();
-                    for (int i = 0; i < headers.Length && i < fields.Length; i++)
+                    string[] fields;
+
+                    try
                     {
-                        row[headers[i].Trim(' ', '\uFEFF', '"')] = fields[i].Trim(' ', '"');
+                        // Attempt to read a CSV row
+                        fields = parser.ReadFields();
                     }
+                    catch (MalformedLineException)
+                    {
+                        // Skip malformed rows instead of crashing
+                        continue;
+                    }
+
+                    // Skip empty or invalid rows
+                    if (fields == null || fields.Length == 0)
+                        continue;
+
+                    var row = new Dictionary<string, string>();
+
+                    // Map fields to headers safely
+                    for (int i = 0; i < headers.Length; i++)
+                    {
+                        // If field count is less than header count, fill empty
+                        string value = i < fields.Length ? fields[i] : string.Empty;
+
+                        row[headers[i]] = value.Trim(' ', '"');
+                    }
+
                     result.Add(row);
                 }
             }
+
             return result;
         }
+
 
         /// <summary>
         /// Determines which limit is used (High > Medium > Low), 
@@ -297,12 +361,168 @@ namespace ExceedanceFilterApp
         /// <summary>
         /// Main logic: applies all filter config, writes output Excel, logs to console and sheet.
         /// </summary>
+        //public static void ExceedanceFilterToExcel(string configCsvPath, string dataCsvPath, string outputExcelPath)
+        //{
+        //    var configRows = LoadCsvToList(configCsvPath);
+        //    var dataRows = LoadCsvToList(dataCsvPath);
+        //    var dataHeaders = dataRows.Count > 0 ? dataRows[0].Keys.ToList() : new List<string>();
+
+        //    if (configRows.Count == 0 || dataRows.Count == 0)
+        //    {
+        //        Console.WriteLine("No data in config or data CSV.");
+        //        return;
+        //    }
+
+        //    var sheetNameCounts = new Dictionary<string, int>();
+        //    using var workbook = new XLWorkbook();
+
+        //    int configRowIndex = 0;
+        //    foreach (var cfg in configRows)
+        //    {
+        //        configRowIndex++;
+
+        //        // --- Sanitize and deduplicate sheet name (Excel rules)
+        //        string baseSheetNameRaw = cfg.GetValueOrDefault("SheetName") ?? "Sheet";
+        //        char[] invalidChars = new char[] { '/', '\\', '?', '*', '[', ']', ':' };
+        //        string baseSheetName = baseSheetNameRaw;
+        //        foreach (var ch in invalidChars)
+        //            baseSheetName = baseSheetName.Replace(ch, '_');
+        //        string sheetNameForCount = baseSheetName.Length > 31 ? baseSheetName.Substring(0, 31) : baseSheetName;
+        //        string validSheetName = sheetNameForCount;
+        //        if (sheetNameCounts.ContainsKey(sheetNameForCount))
+        //        {
+        //            int nextIdx = ++sheetNameCounts[sheetNameForCount];
+        //            string suffix = $"_{nextIdx}";
+        //            int maxLen = 31 - suffix.Length;
+        //            validSheetName = (sheetNameForCount.Length > maxLen ? sheetNameForCount.Substring(0, maxLen) : sheetNameForCount) + suffix;
+        //        }
+        //        else
+        //        {
+        //            sheetNameCounts[sheetNameForCount] = 0;
+        //        }
+
+        //        Console.WriteLine($"[Row {configRowIndex}] Config SheetName: \"{baseSheetNameRaw}\" → Excel SheetName: \"{validSheetName}\"");
+
+        //        // --- Determine which limit is being used (and its label, and note if missing)
+        //        string noteLimit, usedLimitType;
+        //        string usedLimit = DetermineLimit(cfg, out usedLimitType, out noteLimit);
+
+        //        // --- If no limits at all, skip this config row
+        //        if (usedLimit == null)
+        //        {
+        //            Console.WriteLine($"[Row {configRowIndex}] {noteLimit}");
+        //            continue;
+        //        }
+
+        //        // --- Get filter time for the chosen limit, modular and reusable
+        //        int filterTimeSeconds = GetFilterTime(cfg, usedLimitType);
+
+        //        // --- Prepare condition pairs and string
+        //        var conditionPairs = GetConditionPairs(cfg);
+        //        string condString = GetConditionString(conditionPairs);
+
+        //        // --- Filtering rows: all conditions must pass
+        //        List<Dictionary<string, string>> filteredRows = new List<Dictionary<string, string>>();
+        //        string noteCondition = null;
+        //        if (conditionPairs.Count > 0)
+        //        {
+        //            Console.WriteLine($"[Row {configRowIndex}] Filter condition: {condString}");
+        //            filteredRows = dataRows.Where(row => AllConditionsPass(row, conditionPairs)).ToList();
+        //        }
+        //        else
+        //        {
+        //            noteCondition = "Note: No Condition Given";
+        //            Console.WriteLine($"[Row {configRowIndex}] {noteCondition}");
+        //        }
+
+        //        // --- Apply filter time logic ONLY if time column exists and limit is present
+        //        string timeColumn = "HH:MM:SS";
+        //        if (!string.IsNullOrWhiteSpace(usedLimit) && filterTimeSeconds > 1 && filteredRows.Count > 0 && dataHeaders.Contains(timeColumn))
+        //        {
+        //            filteredRows = ApplyFilterTimeGrouping(filteredRows, timeColumn, filterTimeSeconds);
+        //        }
+
+        //        if (filteredRows.Count == 0)
+        //            Console.WriteLine($"[Row {configRowIndex}] Note: No Exceedance Detected");
+
+        //        // --- Write to worksheet ---
+        //        var ws = workbook.Worksheets.Add(validSheetName);
+        //        int rowPtr = 1;
+
+        //        // --- Title: include limit name, value (no parenthesis), and filter time in required format
+        //        ws.Cell(rowPtr, 1).Value = $"{baseSheetNameRaw} > {usedLimitType} {usedLimit} (Filter Time: {filterTimeSeconds} sec)";
+        //        ws.Row(rowPtr).Style.Font.Bold = true;
+        //        ws.Row(rowPtr).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+        //        rowPtr++;
+
+        //        // --- Note: Limits
+        //        if (!string.IsNullOrEmpty(noteLimit))
+        //        {
+        //            ws.Cell(rowPtr, 1).Value = noteLimit;
+        //            ws.Range(rowPtr, 1, rowPtr, dataHeaders.Count).Merge();
+        //            rowPtr++;
+        //        }
+
+        //        // --- Note: Conditions
+        //        if (!string.IsNullOrEmpty(noteCondition))
+        //        {
+        //            ws.Cell(rowPtr, 1).Value = noteCondition;
+        //            ws.Range(rowPtr, 1, rowPtr, dataHeaders.Count).Merge();
+        //            rowPtr++;
+        //        }
+        //        else
+        //        {
+        //            ws.Cell(rowPtr, 1).Value = "Condition Applied: " + condString;
+        //            ws.Range(rowPtr, 1, rowPtr, dataHeaders.Count).Merge();
+        //            rowPtr++;
+        //        }
+
+        //        // --- Header row (always output header)
+        //        for (int c = 0; c < dataHeaders.Count; c++)
+        //        {
+        //            ws.Cell(rowPtr, c + 1).Value = dataHeaders[c];
+        //            ws.Cell(rowPtr, c + 1).Style.Font.Bold = true;
+        //            ws.Cell(rowPtr, c + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        //        }
+        //        rowPtr++;
+
+        //        // --- Write filtered data, or note if empty
+        //        if (filteredRows.Count > 0)
+        //        {
+        //            for (int r = 0; r < filteredRows.Count; r++)
+        //            {
+        //                for (int c = 0; c < dataHeaders.Count; c++)
+        //                {
+        //                    ws.Cell(rowPtr + r, c + 1).Value = filteredRows[r][dataHeaders[c]];
+        //                }
+        //            }
+        //            // Add Row Count in the first empty row after data
+        //            int rowCountCellRow = rowPtr + filteredRows.Count + 1;
+        //            ws.Cell(rowCountCellRow, dataHeaders.Count + 1).Value = $"Row Count: {filteredRows.Count}";
+        //            ws.Cell(rowCountCellRow, dataHeaders.Count + 1).Style.Font.Bold = true;
+        //        }
+        //        else
+        //        {
+        //            ws.Cell(rowPtr, 1).Value = "Note: No Exceedance Detected";
+        //            ws.Range(rowPtr, 1, rowPtr, dataHeaders.Count).Merge();
+        //        }
+
+        //        ws.Columns().AdjustToContents();
+        //        Console.WriteLine(new string('-', 40));
+        //    }
+
+        //    workbook.SaveAs(outputExcelPath);
+        //    Console.WriteLine($"✅ Excel file written: {outputExcelPath}");
+        //}
+
+        //wip
+
         public static void ExceedanceFilterToExcel(string configCsvPath, string dataCsvPath, string outputExcelPath)
         {
             var configRows = LoadCsvToList(configCsvPath);
             var dataRows = LoadCsvToList(dataCsvPath);
             var dataHeaders = dataRows.Count > 0 ? dataRows[0].Keys.ToList() : new List<string>();
-
+            
             if (configRows.Count == 0 || dataRows.Count == 0)
             {
                 Console.WriteLine("No data in config or data CSV.");
@@ -310,6 +530,10 @@ namespace ExceedanceFilterApp
             }
 
             var sheetNameCounts = new Dictionary<string, int>();
+
+            // --- Track if at least one worksheet is created
+            bool isAnyWorksheetCreated = false;
+
             using var workbook = new XLWorkbook();
 
             int configRowIndex = 0;
@@ -323,14 +547,18 @@ namespace ExceedanceFilterApp
                 string baseSheetName = baseSheetNameRaw;
                 foreach (var ch in invalidChars)
                     baseSheetName = baseSheetName.Replace(ch, '_');
+
                 string sheetNameForCount = baseSheetName.Length > 31 ? baseSheetName.Substring(0, 31) : baseSheetName;
                 string validSheetName = sheetNameForCount;
+
                 if (sheetNameCounts.ContainsKey(sheetNameForCount))
                 {
                     int nextIdx = ++sheetNameCounts[sheetNameForCount];
                     string suffix = $"_{nextIdx}";
                     int maxLen = 31 - suffix.Length;
-                    validSheetName = (sheetNameForCount.Length > maxLen ? sheetNameForCount.Substring(0, maxLen) : sheetNameForCount) + suffix;
+                    validSheetName =
+                        (sheetNameForCount.Length > maxLen ? sheetNameForCount.Substring(0, maxLen) : sheetNameForCount)
+                        + suffix;
                 }
                 else
                 {
@@ -339,7 +567,7 @@ namespace ExceedanceFilterApp
 
                 Console.WriteLine($"[Row {configRowIndex}] Config SheetName: \"{baseSheetNameRaw}\" → Excel SheetName: \"{validSheetName}\"");
 
-                // --- Determine which limit is being used (and its label, and note if missing)
+                // --- Determine which limit is being used
                 string noteLimit, usedLimitType;
                 string usedLimit = DetermineLimit(cfg, out usedLimitType, out noteLimit);
 
@@ -350,16 +578,14 @@ namespace ExceedanceFilterApp
                     continue;
                 }
 
-                // --- Get filter time for the chosen limit, modular and reusable
                 int filterTimeSeconds = GetFilterTime(cfg, usedLimitType);
 
-                // --- Prepare condition pairs and string
                 var conditionPairs = GetConditionPairs(cfg);
                 string condString = GetConditionString(conditionPairs);
 
-                // --- Filtering rows: all conditions must pass
                 List<Dictionary<string, string>> filteredRows = new List<Dictionary<string, string>>();
                 string noteCondition = null;
+
                 if (conditionPairs.Count > 0)
                 {
                     Console.WriteLine($"[Row {configRowIndex}] Filter condition: {condString}");
@@ -371,9 +597,11 @@ namespace ExceedanceFilterApp
                     Console.WriteLine($"[Row {configRowIndex}] {noteCondition}");
                 }
 
-                // --- Apply filter time logic ONLY if time column exists and limit is present
                 string timeColumn = "HH:MM:SS";
-                if (!string.IsNullOrWhiteSpace(usedLimit) && filterTimeSeconds > 1 && filteredRows.Count > 0 && dataHeaders.Contains(timeColumn))
+                if (!string.IsNullOrWhiteSpace(usedLimit)
+                    && filterTimeSeconds > 1
+                    && filteredRows.Count > 0
+                    && dataHeaders.Contains(timeColumn))
                 {
                     filteredRows = ApplyFilterTimeGrouping(filteredRows, timeColumn, filterTimeSeconds);
                 }
@@ -381,17 +609,18 @@ namespace ExceedanceFilterApp
                 if (filteredRows.Count == 0)
                     Console.WriteLine($"[Row {configRowIndex}] Note: No Exceedance Detected");
 
-                // --- Write to worksheet ---
+                // --- Create worksheet (this is the key place)
                 var ws = workbook.Worksheets.Add(validSheetName);
+                isAnyWorksheetCreated = true;
+
                 int rowPtr = 1;
 
-                // --- Title: include limit name, value (no parenthesis), and filter time in required format
-                ws.Cell(rowPtr, 1).Value = $"{baseSheetNameRaw} > {usedLimitType} {usedLimit} (Filter Time: {filterTimeSeconds} sec)";
+                ws.Cell(rowPtr, 1).Value =
+                    $"{baseSheetNameRaw} > {usedLimitType} {usedLimit} (Filter Time: {filterTimeSeconds} sec)";
                 ws.Row(rowPtr).Style.Font.Bold = true;
                 ws.Row(rowPtr).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
                 rowPtr++;
 
-                // --- Note: Limits
                 if (!string.IsNullOrEmpty(noteLimit))
                 {
                     ws.Cell(rowPtr, 1).Value = noteLimit;
@@ -399,7 +628,6 @@ namespace ExceedanceFilterApp
                     rowPtr++;
                 }
 
-                // --- Note: Conditions
                 if (!string.IsNullOrEmpty(noteCondition))
                 {
                     ws.Cell(rowPtr, 1).Value = noteCondition;
@@ -413,7 +641,6 @@ namespace ExceedanceFilterApp
                     rowPtr++;
                 }
 
-                // --- Header row (always output header)
                 for (int c = 0; c < dataHeaders.Count; c++)
                 {
                     ws.Cell(rowPtr, c + 1).Value = dataHeaders[c];
@@ -422,7 +649,6 @@ namespace ExceedanceFilterApp
                 }
                 rowPtr++;
 
-                // --- Write filtered data, or note if empty
                 if (filteredRows.Count > 0)
                 {
                     for (int r = 0; r < filteredRows.Count; r++)
@@ -432,9 +658,10 @@ namespace ExceedanceFilterApp
                             ws.Cell(rowPtr + r, c + 1).Value = filteredRows[r][dataHeaders[c]];
                         }
                     }
-                    // Add Row Count in the first empty row after data
+
                     int rowCountCellRow = rowPtr + filteredRows.Count + 1;
-                    ws.Cell(rowCountCellRow, dataHeaders.Count + 1).Value = $"Row Count: {filteredRows.Count}";
+                    ws.Cell(rowCountCellRow, dataHeaders.Count + 1).Value =
+                        $"Row Count: {filteredRows.Count}";
                     ws.Cell(rowCountCellRow, dataHeaders.Count + 1).Style.Font.Bold = true;
                 }
                 else
@@ -443,12 +670,30 @@ namespace ExceedanceFilterApp
                     ws.Range(rowPtr, 1, rowPtr, dataHeaders.Count).Merge();
                 }
 
+
+
+
+
+
+
+
+
+
                 ws.Columns().AdjustToContents();
                 Console.WriteLine(new string('-', 40));
+            }
+
+            // --- SAFETY: ClosedXML requires at least one worksheet
+            if (!isAnyWorksheetCreated)
+            {
+                var ws = workbook.Worksheets.Add("No Data");
+                ws.Cell(1, 1).Value = "No exceedance data generated for the given configuration.";
+                ws.Cell(1, 1).Style.Font.Bold = true;
             }
 
             workbook.SaveAs(outputExcelPath);
             Console.WriteLine($"✅ Excel file written: {outputExcelPath}");
         }
+
     }
 }

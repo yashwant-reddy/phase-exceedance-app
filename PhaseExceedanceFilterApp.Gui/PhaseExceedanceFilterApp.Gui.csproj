@@ -11,6 +11,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <AssemblyName>PC24FDAP</AssemblyName>
+    <Description>CP24 FDAP Analyzer</Description>
   </PropertyGroup>
 
 </Project>

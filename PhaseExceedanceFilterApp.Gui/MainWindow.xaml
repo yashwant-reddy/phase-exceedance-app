@@ -1,0 +1,255 @@
+﻿<Window x:Class="PhaseExceedanceFilterApp.Gui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PC 24 FDAP"
+        Height="580" Width="760"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI">
+
+    <!-- Gradient Background -->
+    <Window.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#F0F5FA" Offset="0.0"/>
+            <GradientStop Color="#D9E6F4" Offset="0.5"/>
+            <GradientStop Color="#C2D7EF" Offset="1.0"/>
+        </LinearGradientBrush>
+    </Window.Background>
+
+    <Window.Resources>
+
+        <!-- Colors -->
+        <Color x:Key="TextDarkGray">#2C2C2C</Color>
+        <Color x:Key="TextInverse">#FFFFFF</Color>
+
+        <Color x:Key="PrimaryBlue">#005A9C</Color>
+        <Color x:Key="PrimaryBlueHover">#0071C0</Color>
+        <Color x:Key="PrimaryBluePressed">#004080</Color>
+
+        <Color x:Key="SecondaryBlue">#007ACC</Color>
+        <Color x:Key="SecondaryBlueHover">#3399FF</Color>
+        <Color x:Key="SecondaryBluePressed">#005BB0</Color>
+
+        <Color x:Key="SelectedColor">#004080</Color>
+        <Color x:Key="DisabledGray">#9E9E9E</Color>
+        <Color x:Key="DisabledTextGray">#C0C0C0</Color>
+        <Color x:Key="BorderGray">#B0B0B0</Color>
+
+        <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextDarkGray}"/>
+        <SolidColorBrush x:Key="TextInverseBrush" Color="{StaticResource TextInverse}"/>
+        <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryBlue}"/>
+        <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{StaticResource PrimaryBlueHover}"/>
+        <SolidColorBrush x:Key="PrimaryPressedBrush" Color="{StaticResource PrimaryBluePressed}"/>
+        <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource SecondaryBlue}"/>
+        <SolidColorBrush x:Key="SecondaryHoverBrush" Color="{StaticResource SecondaryBlueHover}"/>
+        <SolidColorBrush x:Key="SecondaryPressedBrush" Color="{StaticResource SecondaryBluePressed}"/>
+        <SolidColorBrush x:Key="SelectedBrush" Color="{StaticResource SelectedColor}"/>
+        <SolidColorBrush x:Key="DisabledBrush" Color="{StaticResource DisabledGray}"/>
+        <SolidColorBrush x:Key="DisabledTextBrush" Color="{StaticResource DisabledTextGray}"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderGray}"/>
+
+        <!-- ========================= -->
+        <!-- Text Styles -->
+        <!-- ========================= -->
+
+        <Style x:Key="HeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="28"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+
+        <Style x:Key="FormLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <!-- Log TextBox -->
+        <Style x:Key="LogTextBoxStyle" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="Background" Value="WhiteSmoke"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8"/>
+        </Style>
+
+        <!-- Buttons -->
+        <Style x:Key="InteractiveButtonStyle" TargetType="Button">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextInverseBrush}"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="6,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+
+                            <!-- Hover -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource PrimaryHoverBrush}"/>
+                            </Trigger>
+
+                            <!-- Pressed (color change only) -->
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource PrimaryPressedBrush}"/>
+                            </Trigger>
+
+                            <!-- Selected -->
+                            <Trigger Property="Tag" Value="Selected">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource SelectedBrush}"/>
+                            </Trigger>
+
+                            <!-- Disabled -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource DisabledBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource DisabledTextBrush}"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- TextBox with Focus Feedback -->
+        <Style x:Key="AnimatedTextBoxStyle" TargetType="TextBox">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Margin" Value="4,0,4,8"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="textBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ScrollViewer x:Name="PART_ContentHost"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Focus -->
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="textBorder" Property="BorderBrush" Value="{StaticResource PrimaryHoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <!-- ========================= -->
+    <!-- Main UI Layout -->
+    <!-- ========================= -->
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Style="{StaticResource HeaderTextStyle}" Text="PC 24 FDAP"/>
+
+        <!-- File Inputs -->
+        <StackPanel Grid.Row="1" Orientation="Vertical" Margin="0,0,0,12">
+
+            <Grid Margin="0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="180"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="130"/>
+                </Grid.ColumnDefinitions>
+
+                <Label Grid.Column="0" Content="Configuration File:" Style="{StaticResource FormLabelStyle}"/>
+                <TextBox x:Name="ConfigPathBox" Grid.Column="1" Style="{StaticResource AnimatedTextBoxStyle}"/>
+                <Button x:Name="BrowseConfigBtn"
+                        Grid.Column="2"
+                        Style="{StaticResource InteractiveButtonStyle}"
+                        Background="{StaticResource SecondaryBrush}"
+                        Content="Browse"
+                        Click="BrowseConfig_Click" Margin="6,0,6,8"/>
+            </Grid>
+
+            <Grid Margin="0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="180"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="130"/>
+                </Grid.ColumnDefinitions>
+
+                <Label Grid.Column="0" Content="Data File:" Style="{StaticResource FormLabelStyle}"/>
+                <TextBox x:Name="DataPathBox" Grid.Column="1" Style="{StaticResource AnimatedTextBoxStyle}"/>
+                <Button x:Name="BrowseDataBtn"
+                        Grid.Column="2"
+                        Style="{StaticResource InteractiveButtonStyle}"
+                        Background="{StaticResource SecondaryBrush}"
+                        Content="Browse"
+                        Click="BrowseData_Click" Margin="6,0,6,8"/>
+            </Grid>
+        </StackPanel>
+
+        <!-- Actions -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,18">
+            <Button x:Name="PhaseBtn"
+                    Style="{StaticResource InteractiveButtonStyle}"
+                    Background="{StaticResource PrimaryBrush}"
+                    Width="160" Content="Process Phase" Click="Phase_Click"/>
+            <Button x:Name="ExceedanceBtn"
+                    Style="{StaticResource InteractiveButtonStyle}"
+                    Background="{StaticResource PrimaryBrush}"
+                    Width="170" Content="Process Exceedance" Click="Exceedance_Click"/>
+            <Button x:Name="SummaryBtn"
+                    Style="{StaticResource InteractiveButtonStyle}"
+                    Background="{StaticResource SecondaryBrush}"
+                    Width="180" Content="Summary Report" Click="Summary_Click"/>
+        </StackPanel>
+
+        <!-- Loader -->
+        <ProgressBar x:Name="LoaderBar"
+                     Grid.Row="3"
+                     Height="22"
+                     Margin="0,8,0,14"
+                     IsIndeterminate="True"
+                     Visibility="Collapsed"/>
+
+        <!-- Output Log -->
+        <GroupBox Grid.Row="4" Header="Output Log" Margin="0,12,0,0">
+            <TextBox x:Name="LogBox"
+                     Style="{StaticResource LogTextBoxStyle}"
+                     Margin="8"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     IsReadOnly="True"/>
+        </GroupBox>
+
+    </Grid>
+</Window>

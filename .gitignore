@@ -3,3 +3,5 @@ obj/
 *.csv
 *.xlsx
 *.xlsm
+.vs/
+FilteredOutput_CSV/
